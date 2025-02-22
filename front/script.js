@@ -8,39 +8,39 @@ let dataChannel;
 // Define an object that contains multiple functions; methods in fns will be called
 const fns = {
   // Get the HTML content of the current page
-  getPageHTML: () => {
-    return {
-      success: true,
-      html: document.documentElement.outerHTML,
-    }; // Return the entire page's HTML
-  },
-  // Change the background color of the webpage
-  changeBackgroundColor: ({ color }) => {
-    document.body.style.backgroundColor = color; // Change the page's background color
-    return { success: true, color }; // Return the changed color
-  },
-  // Change the text color of the webpage
-  changeTextColor: ({ color }) => {
-    document.body.style.color = color; // Change the page's text color
-    return { success: true, color }; // Return the changed color
-  },
-  // Change the button's style (size and color)
-  changeButtonStyle: ({ size, color }) => {
-    const button = document.querySelector("button"); // Get the first button on the page (modify selector if there are multiple buttons)
-    if (button) {
-      // Change the button's size
-      if (size) {
-        button.style.fontSize = size; // Set font size
-      }
-      // Change the button's color
-      if (color) {
-        button.style.backgroundColor = color; // Set button background color
-      }
-      return { success: true, size, color }; // Return modified button style
-    } else {
-      return { success: false, message: "Button element not found" }; // Return failure if no button is found
-    }
-  },
+  //   getPageHTML: () => {
+  //     return {
+  //       success: true,
+  //       html: document.documentElement.outerHTML,
+  //     }; // Return the entire page's HTML
+  //   },
+  //   // Change the background color of the webpage
+  //   changeBackgroundColor: ({ color }) => {
+  //     document.body.style.backgroundColor = color; // Change the page's background color
+  //     return { success: true, color }; // Return the changed color
+  //   },
+  //   // Change the text color of the webpage
+  //   changeTextColor: ({ color }) => {
+  //     document.body.style.color = color; // Change the page's text color
+  //     return { success: true, color }; // Return the changed color
+  //   },
+  //   // Change the button's style (size and color)
+  //   changeButtonStyle: ({ size, color }) => {
+  //     const button = document.querySelector("button"); // Get the first button on the page (modify selector if there are multiple buttons)
+  //     if (button) {
+  //       // Change the button's size
+  //       if (size) {
+  //         button.style.fontSize = size; // Set font size
+  //       }
+  //       // Change the button's color
+  //       if (color) {
+  //         button.style.backgroundColor = color; // Set button background color
+  //       }
+  //       return { success: true, size, color }; // Return modified button style
+  //     } else {
+  //       return { success: false, message: "Button element not found" }; // Return failure if no button is found
+  //     }
+  //   },
   // Add the search function
   search_hospital: async ({ query }) => {
     try {
@@ -78,34 +78,43 @@ function handleTrack(event) {
 function createDataChannel() {
   // Create a data channel named 'response'
   dataChannel = peerConnection.createDataChannel("response");
+
   // Configure data channel events
   dataChannel.addEventListener("open", () => {
     console.log("Data channel opened");
     configureData(); // Configure data channel functions
   });
+
+  // Move the message event listener here inside createDataChannel
   dataChannel.addEventListener("message", async (ev) => {
-    const msg = JSON.parse(ev.data); // Parse the received message
-    // If the message type is 'response.function_call_arguments.done', it indicates a function call request
+    console.log("Received message from server:", ev.data);
+    const msg = JSON.parse(ev.data);
+
+    // Handle function calls
     if (msg.type === "response.function_call_arguments.done") {
-      const fn = fns[msg.name]; // Get the corresponding function by name
+      const fn = fns[msg.name];
       if (fn !== undefined) {
         console.log(
           `Calling local function ${msg.name}, parameters ${msg.arguments}`
         );
-        const args = JSON.parse(msg.arguments); // Parse function parameters
-        const result = await fn(args); // Call the local function and wait for the result
-        console.log("Result", result); // Log the result of the function
-        // Send the result of the function execution back to the other party
+        const args = JSON.parse(msg.arguments);
+        const result = await fn(args);
+        console.log("Result", result);
         const event = {
-          type: "conversation.item.create", // Create conversation item event
+          type: "conversation.item.create",
           item: {
-            type: "function_call_output", // Function call output
-            call_id: msg.call_id, // Passed call_id
-            output: JSON.stringify(result), // JSON string of the function execution result
+            type: "function_call_output",
+            call_id: msg.call_id,
+            output: JSON.stringify(result),
           },
         };
-        dataChannel.send(JSON.stringify(event)); // Send the result back to the remote side
+        dataChannel.send(JSON.stringify(event));
       }
+    }
+
+    // Handle text responses
+    if (msg.type === "response.text.delta") {
+      addMessageToChat(msg.delta.text, false);
     }
   });
 }
@@ -116,6 +125,8 @@ function configureData() {
   const event = {
     type: "session.update", // Session update event
     session: {
+      instructions:
+        "You are a Patient Virtual Assistant for Doctor Samir Abbas Hospital in Jeddah. In the tools you have the search tool to search through the knowledge base of hospital to find relevant information. Respond to the user in a friendly and helpful manner.",
       modalities: ["text", "audio"], // Supported interaction modes: text and audio
       // Provide functional tools, pay attention to the names of these tools corresponding to the keys in the above fns object
       tools: [
@@ -266,3 +277,80 @@ function stopWebRTC() {
   // Mark WebRTC as not active
   isWebRTCActive = false;
 }
+
+// Add these new functions and event listeners after the existing code
+const textInput = document.getElementById("textInput");
+const sendButton = document.getElementById("sendButton");
+const chatMessages = document.getElementById("chatMessages");
+
+// Function to add a message to the chat display
+function addMessageToChat(text, isUser = false) {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = `message ${
+    isUser ? "user-message" : "assistant-message"
+  }`;
+  messageDiv.textContent = text;
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Function to send text message to the model
+async function sendTextMessage(text) {
+  if (!isWebRTCActive || !dataChannel) {
+    console.log("WebRTC status:", isWebRTCActive, "dataChannel:", dataChannel);
+    alert("Please start the connection first");
+    return;
+  }
+
+  console.log("Sending message:", text);
+  // Add user message to chat
+  addMessageToChat(text, true);
+
+  // Create conversation item with text
+  const createMessage = {
+    type: "conversation.item.create",
+    item: {
+      type: "message",
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: text,
+        },
+      ],
+    },
+  };
+
+  // Send the message
+  dataChannel.send(JSON.stringify(createMessage));
+
+  // Request response from the model
+  const createResponse = {
+    type: "response.create",
+    response: {
+      modalities: ["text", "audio"],
+    },
+  };
+
+  dataChannel.send(JSON.stringify(createResponse));
+}
+
+// Handle send button click
+sendButton.addEventListener("click", () => {
+  const text = textInput.value.trim();
+  if (text) {
+    sendTextMessage(text);
+    textInput.value = "";
+  }
+});
+
+// Handle enter key in input
+textInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    const text = textInput.value.trim();
+    if (text) {
+      sendTextMessage(text);
+      textInput.value = "";
+    }
+  }
+});
