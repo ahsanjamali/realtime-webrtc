@@ -41,6 +41,29 @@ const fns = {
       return { success: false, message: "Button element not found" }; // Return failure if no button is found
     }
   },
+  // Add the search function
+  search_hospital: async ({ query }) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      return {
+        success: true,
+        results: data.results,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  },
 };
 
 // When an audio stream is received, add it to the page and play it
@@ -148,6 +171,23 @@ function configureData() {
                   'Background color of the button (e.g., "#ff0000" or "red")',
               }, // Button color
             },
+          },
+        },
+        // Add the search tool definition
+        {
+          type: "function",
+          name: "search_hospital",
+          description:
+            "Search through the knowledge base of hospital to find relevant information",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query to find relevant information",
+              },
+            },
+            required: ["query"],
           },
         },
       ],

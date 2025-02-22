@@ -1,18 +1,27 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 import requests
 import os
 import json
 import logging
 from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings
+from langchain_qdrant import Qdrant 
+import qdrant_client
 
 # Load environment variables from .env file (optional)
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configure CORS to allow all origins (adjust in production for better security)
-CORS(app)
+# Configure CORS to allow all origins (for development only)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +37,24 @@ OPENAI_SESSION_URL = "https://api.openai.com/v1/realtime/sessions"
 OPENAI_API_URL = "https://api.openai.com/v1/realtime"  # May vary based on requirements
 MODEL_ID = "gpt-4o-realtime-preview-2024-12-17"
 VOICE = "ash"  # Or other voices
-DEFAULT_INSTRUCTIONS = "You are helpful and have some tools installed.\n\nIn the tools you have the ability to control a robot hand."
+DEFAULT_INSTRUCTIONS = "You are a Patient Virtual Assistant for Doctor Samir Abbas Hospital in Jeddah..\n\nIn the tools you have the search tool to search through the knowledge base of hospital to find relevant information. Respond to the user in a friendly and helpful manner."
+
+def get_vector_store():
+    client = qdrant_client.QdrantClient(
+        url=os.getenv("QDRANT_HOST"),
+        api_key=os.getenv("QDRANT_API_KEY"),
+    )
+    embeddings = OpenAIEmbeddings()
+    vector_store = Qdrant(
+        client=client,
+        collection_name=os.getenv("QDRANT_COLLECTION_NAME"),
+        embeddings=embeddings,
+    )
+    return vector_store
+
+vector_store = get_vector_store()
+
+
 
 @app.route('/')
 def home():
@@ -111,6 +137,41 @@ def connect_rtc():
     except Exception as e:
         logger.exception("An error occurred during the RTC connection process.")
         return Response(f"An error occurred: {str(e)}", status=500)
+
+# Search endpoint
+@app.route('/api/search', methods=['POST'])
+def search():
+    try:
+        query = request.json.get('query')
+        if not query:
+            return jsonify({"error": "No query provided"}), 400
+
+        app.logger.info(f"Searching for: {query}")
+        
+        # Use existing vector store to search
+        results = vector_store.similarity_search_with_score(
+            query,
+            k=3  # Adjust number of results as needed
+        )
+
+        # Format results for the model
+        formatted_results = []
+        for doc, score in results:
+            formatted_results.append({
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+                "relevance_score": float(score)  # Convert score to float for JSON serialization
+            })
+
+        app.logger.info(f"Found {len(formatted_results)} results")
+        return jsonify({
+            "results": formatted_results
+        })
+    except Exception as e:
+        app.logger.error(f"Search error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == '__main__':
     # Ensure the server runs on port 8813
