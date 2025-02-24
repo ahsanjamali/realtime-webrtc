@@ -58,6 +58,12 @@ function createDataChannel() {
     const msg = JSON.parse(ev.data);
     console.log("Received message type:", msg.type, "Full message:", msg);
 
+    // Handle input audio transcription
+    if (msg.type === "conversation.item.input_audio_transcription.completed") {
+      console.log("Received audio transcript:", msg.transcript);
+      addMessageToChat(msg.transcript, true); // true indicates it's a user message
+    }
+
     // Handle function calls
     if (msg.type === "response.function_call_arguments.done") {
       const fn = fns[msg.name];
@@ -123,6 +129,9 @@ function configureData() {
         "You are a Patient Virtual Assistant for Doctor Samir Abbas Hospital in Jeddah. In the tools you have the search tool to search through the knowledge base of hospital to find relevant information. Respond to the user in a friendly and helpful manner.",
       modalities: ["text", "audio"],
       turn_detection: null, // Disable VAD by default
+      input_audio_transcription: {
+        model: "whisper-1",
+      },
       tools: [
         {
           type: "function",
