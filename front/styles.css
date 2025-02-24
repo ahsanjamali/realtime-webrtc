@@ -58,6 +58,7 @@ footer a {
 .input-container {
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 #textInput {
@@ -65,6 +66,27 @@ footer a {
   padding: 8px;
 }
 
-#sendButton {
+#sendButton,
+#micButton {
   padding: 8px 16px;
+  cursor: pointer;
 }
+
+#micButton {
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#micButton.recording {
+  background-color: #ff4444;
+  color: white;
+}
+
+/* Add Font Awesome for the microphone icon */
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css");

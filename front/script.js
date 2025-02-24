@@ -5,6 +5,8 @@ let isWebRTCActive = false;
 // Create variables related to the WebRTC connection
 let peerConnection;
 let dataChannel;
+// Add these variables at the top with other global variables
+let isRecording = false;
 // Define an object that contains multiple functions; methods in fns will be called
 const fns = {
   // Add the search function
@@ -115,14 +117,13 @@ function createDataChannel() {
 function configureData() {
   console.log("Configuring data channel");
   const event = {
-    type: "session.update", // Session update event
+    type: "session.update",
     session: {
       instructions:
         "You are a Patient Virtual Assistant for Doctor Samir Abbas Hospital in Jeddah. In the tools you have the search tool to search through the knowledge base of hospital to find relevant information. Respond to the user in a friendly and helpful manner.",
-      modalities: ["audio", "text"], // Supported interaction modes: text and audio
-      // Provide functional tools, pay attention to the names of these tools corresponding to the keys in the above fns object
+      modalities: ["text", "audio"],
+      turn_detection: null, // Disable VAD by default
       tools: [
-        // Add the search tool definition
         {
           type: "function",
           name: "search_hospital",
@@ -142,7 +143,7 @@ function configureData() {
       ],
     },
   };
-  dataChannel.send(JSON.stringify(event)); // Send the configured event data
+  dataChannel.send(JSON.stringify(event));
 }
 
 // Get the control button element
@@ -290,5 +291,40 @@ textInput.addEventListener("keypress", (e) => {
       sendTextMessage(text);
       textInput.value = "";
     }
+  }
+});
+
+// Add mic button functionality
+const micButton = document.getElementById("micButton");
+
+micButton.addEventListener("click", () => {
+  if (!isWebRTCActive || !dataChannel) {
+    alert("Please start the connection first");
+    return;
+  }
+
+  isRecording = !isRecording;
+  micButton.classList.toggle("recording");
+
+  if (isRecording) {
+    // Enable VAD when mic button is clicked
+    const enableVAD = {
+      type: "session.update",
+      session: {
+        turn_detection: {
+          type: "server_vad", // or other VAD settings as needed
+        },
+      },
+    };
+    dataChannel.send(JSON.stringify(enableVAD));
+  } else {
+    // Disable VAD when mic button is clicked again
+    const disableVAD = {
+      type: "session.update",
+      session: {
+        turn_detection: null,
+      },
+    };
+    dataChannel.send(JSON.stringify(disableVAD));
   }
 });
