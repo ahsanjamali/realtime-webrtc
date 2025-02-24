@@ -76,6 +76,13 @@ function createDataChannel() {
         };
         dataChannel.send(JSON.stringify(event));
       }
+      const createResponse = {
+        type: "response.create",
+        response: {
+          modalities: ["text", "audio"],
+        },
+      };
+      dataChannel.send(JSON.stringify(createResponse));
     }
 
     // Handle text responses
