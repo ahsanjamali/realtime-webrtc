@@ -7,40 +7,6 @@ let peerConnection;
 let dataChannel;
 // Define an object that contains multiple functions; methods in fns will be called
 const fns = {
-  // Get the HTML content of the current page
-  //   getPageHTML: () => {
-  //     return {
-  //       success: true,
-  //       html: document.documentElement.outerHTML,
-  //     }; // Return the entire page's HTML
-  //   },
-  //   // Change the background color of the webpage
-  //   changeBackgroundColor: ({ color }) => {
-  //     document.body.style.backgroundColor = color; // Change the page's background color
-  //     return { success: true, color }; // Return the changed color
-  //   },
-  //   // Change the text color of the webpage
-  //   changeTextColor: ({ color }) => {
-  //     document.body.style.color = color; // Change the page's text color
-  //     return { success: true, color }; // Return the changed color
-  //   },
-  //   // Change the button's style (size and color)
-  //   changeButtonStyle: ({ size, color }) => {
-  //     const button = document.querySelector("button"); // Get the first button on the page (modify selector if there are multiple buttons)
-  //     if (button) {
-  //       // Change the button's size
-  //       if (size) {
-  //         button.style.fontSize = size; // Set font size
-  //       }
-  //       // Change the button's color
-  //       if (color) {
-  //         button.style.backgroundColor = color; // Set button background color
-  //       }
-  //       return { success: true, size, color }; // Return modified button style
-  //     } else {
-  //       return { success: false, message: "Button element not found" }; // Return failure if no button is found
-  //     }
-  //   },
   // Add the search function
   search_hospital: async ({ query }) => {
     try {
@@ -87,8 +53,8 @@ function createDataChannel() {
 
   // Move the message event listener here inside createDataChannel
   dataChannel.addEventListener("message", async (ev) => {
-    console.log("Received message from server:", ev.data);
     const msg = JSON.parse(ev.data);
+    console.log("Received message type:", msg.type, "Full message:", msg);
 
     // Handle function calls
     if (msg.type === "response.function_call_arguments.done") {
@@ -114,7 +80,26 @@ function createDataChannel() {
 
     // Handle text responses
     if (msg.type === "response.text.delta") {
-      addMessageToChat(msg.delta.text, false);
+      console.log("Received text delta:", msg.delta);
+      addMessageToChat(msg.delta, false);
+    }
+
+    // Handle final response output
+    if (msg.type === "response.done") {
+      console.log("Final response:", msg.response.output[0]);
+      // Check if there's content in the output
+      const output = msg.response.output[0];
+      const outputContent = msg.response.output[0];
+      console.log("Output content:", outputContent);
+      if (output && output.content) {
+        for (const content of output.content) {
+          if (content.type === "text") {
+            addMessageToChat(content.text, false);
+          } else if (content.type === "audio" && content.transcript) {
+            addMessageToChat(content.transcript, false);
+          }
+        }
+      }
     }
   });
 }
@@ -127,63 +112,9 @@ function configureData() {
     session: {
       instructions:
         "You are a Patient Virtual Assistant for Doctor Samir Abbas Hospital in Jeddah. In the tools you have the search tool to search through the knowledge base of hospital to find relevant information. Respond to the user in a friendly and helpful manner.",
-      modalities: ["text", "audio"], // Supported interaction modes: text and audio
+      modalities: ["audio", "text"], // Supported interaction modes: text and audio
       // Provide functional tools, pay attention to the names of these tools corresponding to the keys in the above fns object
       tools: [
-        {
-          type: "function", // Tool type is function
-          name: "changeBackgroundColor", // Function name
-          description: "Change the background color of the webpage", // Description
-          parameters: {
-            // Parameter description
-            type: "object",
-            properties: {
-              color: {
-                type: "string",
-                description: "Hexadecimal value of the color",
-              }, // Color parameter
-            },
-          },
-        },
-        {
-          type: "function",
-          name: "changeTextColor",
-          description: "Change the text color of the webpage",
-          parameters: {
-            type: "object",
-            properties: {
-              color: {
-                type: "string",
-                description: "Hexadecimal value of the color",
-              },
-            },
-          },
-        },
-        {
-          type: "function",
-          name: "getPageHTML",
-          description: "Get the HTML content of the current page",
-        },
-        {
-          type: "function", // Tool type is function
-          name: "changeButtonStyle", // New function name
-          description: "Change the size and color of the button", // Description
-          parameters: {
-            // Parameter description
-            type: "object",
-            properties: {
-              size: {
-                type: "string",
-                description: 'Font size of the button (e.g., "16px" or "1em")',
-              }, // Button size
-              color: {
-                type: "string",
-                description:
-                  'Background color of the button (e.g., "#ff0000" or "red")',
-              }, // Button color
-            },
-          },
-        },
         // Add the search tool definition
         {
           type: "function",
